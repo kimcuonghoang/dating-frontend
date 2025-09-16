@@ -12,7 +12,9 @@
   "dependencies": {
     "@tailwindcss/cli": "^4.1.13",
     "@tailwindcss/vite": "^4.1.13",
+    "@tanstack/react-query": "^5.89.0",
     "antd": "^5.27.3",
+    "axios": "^1.12.2",
     "echarts": "^6.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

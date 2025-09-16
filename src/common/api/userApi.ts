@@ -1,4 +1,4 @@
-import api from ".";
+import api from "./index";
 
 export const getProfileUser = (userId: string) => {
   const res = api.get(`/users/${userId}`);

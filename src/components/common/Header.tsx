@@ -1,11 +1,12 @@
 import { Button, Input, message, Modal } from "antd";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { authLogin, authRegister } from "../../common/api/authApi";
 
 const Header = () => {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [userRole, setUserRole] = useState<"guest" | "user" | "admin">("guest");
-  const [activeTab, setActiveTab] = useState("discover");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authForm, setAuthForm] = useState({
     email: "",
@@ -15,28 +16,59 @@ const Header = () => {
     gender: "male",
   });
 
+  // Mutation cho login
+  const loginMutation = useMutation({
+    mutationFn: (data: { email: string; password: string }) => authLogin(data),
+    onSuccess: (res) => {
+      setUserRole("user");
+      setShowAuthModal(false);
+      message.success("Đăng nhập thành công!");
+      // Có thể lưu token vào localStorage nếu API trả về
+      const { accessToken, user } = res.data.data;
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("user", JSON.stringify(user));
+    },
+    onError: (err: any) => {
+      message.error(err.response?.data?.message || "Đăng nhập thất bại!");
+    },
+  });
+
+  // Mutation cho register
+  const registerMutation = useMutation({
+    mutationFn: (data: any) => authRegister(data),
+    onSuccess: (res) => {
+      setUserRole("user");
+      setShowAuthModal(false);
+      message.success("Đăng ký thành công!");
+      localStorage.setItem("token", res.data.token);
+    },
+    onError: (err: any) => {
+      message.error(err.response?.data?.message || "Đăng ký thất bại!");
+    },
+  });
+
   const handleAuth = () => {
     if (authMode === "login") {
-      // Here you would typically make an API call to verify credentials
-      if (authForm.email && authForm.password) {
-        setUserRole("user");
-        setShowAuthModal(false);
-        message.success("Đăng nhập thành công!");
+      if (!authForm.email || !authForm.password) {
+        return message.warning("Vui lòng điền đầy đủ thông tin!");
       }
+      loginMutation.mutate({
+        email: authForm.email,
+        password: authForm.password,
+      });
     } else {
-      // Here you would typically make an API call to register
       if (
-        authForm.email &&
-        authForm.password &&
-        authForm.name &&
-        authForm.age
+        !authForm.email ||
+        !authForm.password ||
+        !authForm.name ||
+        !authForm.age
       ) {
-        setUserRole("user");
-        setShowAuthModal(false);
-        message.success("Đăng ký thành công!");
+        return message.warning("Vui lòng điền đầy đủ thông tin!");
       }
+      registerMutation.mutate(authForm);
     }
   };
+
   return (
     <>
       <header className="bg-white shadow-sm fixed w-full top-0 z-50">
@@ -160,6 +192,7 @@ const Header = () => {
                     type="primary"
                     block
                     onClick={handleAuth}
+                    // loading={loginMutation || registerMutation}
                     className="!rounded-button whitespace-nowrap cursor-pointer bg-gradient-to-r from-pink-500 to-red-500 border-0 h-auto py-2"
                   >
                     {authMode === "login" ? "Đăng Nhập" : "Đăng Ký"}
