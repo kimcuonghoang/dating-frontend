@@ -26,7 +26,7 @@ const Header = () => {
       // Có thể lưu token vào localStorage nếu API trả về
       const { accessToken, user } = res.data.data;
       localStorage.setItem("accessToken", accessToken);
-      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("userId", user._id);
     },
     onError: (err: any) => {
       message.error(err.response?.data?.message || "Đăng nhập thất bại!");

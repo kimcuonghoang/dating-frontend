@@ -1,29 +1,121 @@
-import React from "react";
-import {
-  Button,
-  Input,
-  Card,
-  Avatar,
-  Badge,
-  Tabs,
-  Table,
-  Switch,
-  Modal,
-  message,
-} from "antd";
+import { useEffect, useState } from "react";
+import { Button, Input, Avatar, Tabs, message, Spin } from "antd";
 import {
   UserOutlined,
-  MessageOutlined,
   SearchOutlined,
-  SettingOutlined,
-  BarChartOutlined,
-  ExclamationCircleOutlined,
-  EyeOutlined,
-  BlockOutlined,
   HeartOutlined,
   CloseOutlined,
 } from "@ant-design/icons";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { getAllUser } from "../../common/api/userApi";
+import { getMessage } from "../../common/api/messageApi";
+import { likeUser } from "../../common/api/likeApi";
+import { getMatches } from "../../common/api/matchApi";
+import { socket } from "../../common/middlewares/socket";
 const FeaturesPage = () => {
+  const [activeTab, setActiveTab] = useState("discover");
+  const [currentUserIndex, setCurrentUserIndex] = useState(0);
+  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [messageInput, setMessageInput] = useState("");
+  const [messages, setMessages] = useState<any[]>([]);
+
+  const userId = localStorage.getItem("userId");
+  const { data: users, isLoading: loadingUser } = useQuery({
+    queryKey: ["USERS"],
+    queryFn: () => getAllUser(),
+  });
+
+  // Query matches của user
+  const { data: matches, isLoading: loadingMatch } = useQuery({
+    queryKey: ["MATCHES", userId],
+    queryFn: () => getMatches(userId!),
+    enabled: !!userId,
+  });
+
+  // Gửi like
+  const likeMutation = useMutation({
+    mutationFn: (id: string) => likeUser(id),
+    onSuccess: () => {
+      message.success("Đã like người dùng!");
+    },
+    onError: () => {
+      message.error("Like thất bại!");
+    },
+  });
+
+  const handleSwipeUser = (action: "like" | "pass") => {
+    const currentUser = users?.[currentUserIndex];
+    if (!currentUser) return;
+
+    if (action === "like") {
+      likeMutation.mutate(currentUser._id);
+    }
+
+    setCurrentUserIndex((prev) => (prev + 1 < users.length ? prev + 1 : 0));
+  };
+
+  // Lấy tin nhắn khi chọn chat
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    // fetch tin nhắn cũ
+    getMessage(selectedChat).then((res: any) => {
+      setMessages(res.data.data);
+    });
+
+    // join room
+    socket.emit("joinRoom", selectedChat);
+
+    const handleReceiveMessage = (msg: any) => {
+      if (msg.matchId === selectedChat) {
+        setMessages((prev) => [...prev, msg]);
+      }
+    };
+
+    socket.on("receiveMessage", handleReceiveMessage);
+
+    return () => {
+      socket.emit("leaveRoom", selectedChat);
+      socket.off("receiveMessage", handleReceiveMessage);
+    };
+  }, [selectedChat]);
+
+  // Gửi tin nhắn
+  const handleSendMessage = () => {
+    if (!messageInput.trim()) return;
+    if (!selectedChat) {
+      message.warning("Chọn một match để trò chuyện!");
+      return;
+    }
+
+    const newMsg = {
+      matchId: selectedChat,
+      senderId: userId,
+      content: messageInput,
+    };
+
+    socket.emit("sendMessage", newMsg);
+
+    // Optimistic UI
+    // setMessages((prev) => [
+    //   ...prev,
+    //   { ...newMsg, createdAt: new Date().toISOString() },
+    // ]);
+
+    setMessageInput("");
+  };
+
+  // loading
+  if (loadingUser || loadingMatch) {
+    return <Spin>Loading...</Spin>;
+  }
+  if (!users || users.length === 0) {
+    return <div>Không có user nào để hiển thị.</div>;
+  }
+
+  const currentUser = users[currentUserIndex];
+  const photoUrl = currentUser?.photos?.[0] || "/default-avatar.png";
+
   return (
     <div className="h-screen flex bg-gray-50">
       <style>{`
@@ -56,12 +148,6 @@ transform: rotateY(5deg);
                 LoveConnect
               </span>
             </div>
-            <Button
-              type="text"
-              icon={<SettingOutlined />}
-              className="cursor-pointer"
-              onClick={() => setUserRole("guest")}
-            />
           </div>
           <Tabs
             activeKey={activeTab}
@@ -81,10 +167,11 @@ transform: rotateY(5deg);
                 label: (
                   <span className="flex items-center space-x-2">
                     <i className="fas fa-comments"></i>
-                    <span>Match ({matches.length})</span>
+                    <span>Match ({matches?.length ?? 0})</span>
                   </span>
                 ),
               },
+
               {
                 key: "profile",
                 label: (
@@ -113,48 +200,29 @@ transform: rotateY(5deg);
             </div>
           ) : activeTab === "matches" ? (
             <div className="p-4 space-y-2">
-              {matches.map((match) => (
+              {matches?.map((match: any) => (
                 <div
-                  key={match.id}
+                  key={match.matchId}
                   className={`p-4 rounded-lg cursor-pointer transition-colors ${
-                    selectedChat === match.id
+                    selectedChat === match.matchId
                       ? "bg-pink-50 border border-pink-200"
                       : "hover:bg-gray-50"
                   }`}
-                  onClick={() => setSelectedChat(match.id)}
+                  onClick={() => setSelectedChat(match.matchId)}
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="relative">
-                      <Avatar src={match.avatar} size={48} />
-                      {match.online && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-                      )}
-                    </div>
+                    <Avatar src={match.user.photos?.[0]} size={48} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center">
-                        <h4 className="font-medium text-gray-900 truncate flex items-center">
-                          {match.name}
-                          <i className="fas fa-heart text-pink-500 ml-2 text-xs"></i>
-                        </h4>
-                        <span className="text-xs text-gray-500">
-                          {match.time}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 truncate">
-                        {match.lastMessage}
-                      </p>
+                      <h4 className="font-medium text-gray-900 truncate flex items-center">
+                        {match.user.username}
+                      </h4>
                     </div>
                   </div>
                 </div>
               ))}
-              {matches.length === 0 && (
-                <div className="text-center py-8">
-                  <i className="fas fa-heart text-4xl text-gray-300 mb-4"></i>
-                  <p className="text-gray-500">Chưa có match nào</p>
-                  <p className="text-sm text-gray-400">
-                    Hãy thử khám phá thêm hồ sơ!
-                  </p>
-                </div>
+
+              {matches && matches.length === 0 && (
+                <p className="p-4 text-gray-500">No matches yet</p>
               )}
             </div>
           ) : (
@@ -194,6 +262,7 @@ transform: rotateY(5deg);
           )}
         </div>
       </div>
+
       {/* Main Area */}
       <div className="flex-1 flex flex-col">
         {activeTab === "discover" ? (
@@ -202,48 +271,37 @@ transform: rotateY(5deg);
               <div className="profile-card bg-white rounded-3xl shadow-2xl overflow-hidden relative">
                 <div className="h-96 relative overflow-hidden">
                   <img
-                    src={mockProfiles[currentUserIndex].photos[0]}
-                    alt={mockProfiles[currentUserIndex].name}
-                    className="w-full h-full object-cover object-top"
+                    src={photoUrl}
+                    alt={currentUser?.username || "No name"}
+                    className="w-full h-full object-cover rounded-2xl shadow-lg"
                   />
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-sm">
-                    <i className="fas fa-map-marker-alt text-pink-500 mr-1"></i>
-                    {mockProfiles[currentUserIndex].distance}
-                  </div>
                 </div>
                 <div className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        {mockProfiles[currentUserIndex].name},{" "}
-                        {mockProfiles[currentUserIndex].age}
-                      </h2>
-                      <p className="text-gray-500 flex items-center">
-                        <i className="fas fa-map-marker-alt mr-1"></i>
-                        {mockProfiles[currentUserIndex].location}
-                      </p>
-                    </div>
-                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {currentUser.username} {currentUser.age}
+                  </h2>
                   <p className="text-gray-600 mb-4 text-sm leading-relaxed">
-                    {mockProfiles[currentUserIndex].bio}
+                    {currentUser.bio}
                   </p>
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {mockProfiles[currentUserIndex].interests.map(
-                      (interest, index) => (
+                  {currentUser?.interests?.length ? (
+                    currentUser.interests.map(
+                      (interest: string, index: number) => (
                         <span
                           key={index}
-                          className="bg-pink-100 text-pink-600 px-3 py-1 rounded-full text-sm"
+                          className="bg-pink-100 text-pink-600 px-3 py-1 rounded-full text-sm mr-2"
                         >
                           {interest}
                         </span>
                       )
-                    )}
-                  </div>
-                  <div className="flex justify-center space-x-4">
+                    )
+                  ) : (
+                    <p className="text-gray-400">Chưa có sở thích</p>
+                  )}
+                  <div className="flex justify-center space-x-4 mt-6">
                     <Button
                       shape="circle"
                       size="large"
-                      className="!rounded-button cursor-pointer w-14 h-14 border-2 border-gray-300 hover:border-gray-400"
+                      className="!rounded-button w-14 h-14 border-2 border-gray-300"
                       onClick={() => handleSwipeUser("pass")}
                     >
                       <CloseOutlined className="text-xl text-gray-500" />
@@ -251,17 +309,10 @@ transform: rotateY(5deg);
                     <Button
                       shape="circle"
                       size="large"
-                      className="!rounded-button cursor-pointer w-16 h-16 bg-gradient-to-r from-pink-500 to-red-500 border-0 hover:from-pink-600 hover:to-red-600"
+                      className="!rounded-button w-16 h-16 bg-gradient-to-r from-pink-500 to-red-500 border-0"
                       onClick={() => handleSwipeUser("like")}
                     >
                       <HeartOutlined className="text-2xl text-white" />
-                    </Button>
-                    <Button
-                      shape="circle"
-                      size="large"
-                      className="!rounded-button cursor-pointer w-14 h-14 border-2 border-blue-300 hover:border-blue-400"
-                    >
-                      <i className="fas fa-star text-xl text-blue-500"></i>
                     </Button>
                   </div>
                 </div>
@@ -274,74 +325,67 @@ transform: rotateY(5deg);
             <div className="bg-white border-b border-gray-200 p-4">
               <div className="flex items-center space-x-3">
                 <Avatar
-                  src={matches.find((m) => m.id === selectedChat)?.avatar}
+                  src={
+                    matches.find((m: any) => m.matchId === selectedChat)?.user
+                      ?.photos?.[0]
+                  }
                   size={40}
                 />
-                <div>
-                  <h3 className="font-medium text-gray-900 flex items-center">
-                    {matches.find((m) => m.id === selectedChat)?.name}
-                    <i className="fas fa-heart text-pink-500 ml-2 text-xs"></i>
-                  </h3>
-                  <p className="text-sm text-green-500">Đang hoạt động</p>
-                </div>
+                <h3 className="font-medium text-gray-900">
+                  {
+                    matches.find((m: any) => m.matchId === selectedChat)?.user
+                      ?.username
+                  }
+                </h3>
               </div>
             </div>
+
             {/* Messages */}
             <div className="flex-1 p-6 overflow-y-auto bg-gradient-to-b from-pink-50/50 to-white">
-              <div className="text-center mb-6">
-                <div className="bg-white rounded-2xl p-4 shadow-sm inline-block">
-                  <i className="fas fa-heart text-pink-500 text-2xl mb-2"></i>
-                  <p className="text-sm text-gray-600">
-                    Bạn và {matches.find((m) => m.id === selectedChat)?.name} đã
-                    match!
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Hãy bắt đầu cuộc trò chuyện
-                  </p>
-                </div>
-              </div>
               <div className="space-y-4">
-                <div className="flex justify-start">
-                  <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 max-w-xs shadow-sm border border-pink-100">
-                    <p className="text-gray-800">
-                      Chào bạn! Rất vui được match với bạn 😊
-                    </p>
-                    <span className="text-xs text-gray-500 mt-1 block">
-                      10:30
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <div className="bg-gradient-to-r from-pink-500 to-red-500 text-white rounded-2xl rounded-br-md px-4 py-3 max-w-xs">
-                    <p>
-                      Chào bạn! Mình cũng rất vui. Bạn có thích du lịch không?
-                    </p>
-                    <span className="text-xs text-pink-100 mt-1 block">
-                      10:32
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-start">
-                  <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 max-w-xs shadow-sm border border-pink-100">
-                    <p className="text-gray-800">
-                      Có chứ! Mình rất thích khám phá những địa điểm mới. Bạn đã
-                      đi đâu gần đây chưa?
-                    </p>
-                    <span className="text-xs text-gray-500 mt-1 block">
-                      10:35
-                    </span>
-                  </div>
-                </div>
+                {messages.map((msg: any, idx) => {
+                  const sender = msg.senderId?._id || msg.senderId; // nếu populate thì dùng _id
+                  const isMine = sender?.toString() === userId?.toString();
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex ${
+                        isMine ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`px-4 py-3 max-w-xs rounded-2xl shadow-sm ${
+                          isMine
+                            ? "bg-gradient-to-r from-pink-500 to-red-500 text-white rounded-br-md"
+                            : "bg-white border border-pink-100 text-gray-800 rounded-bl-md"
+                        }`}
+                      >
+                        <p>{msg.content}</p>
+                        <span className="text-xs text-gray-500 mt-1 block">
+                          {new Date(
+                            msg.sendTime || msg.createdAt
+                          ).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {!messages.length && (
+                  <p className="text-gray-400 text-center">
+                    Chưa có tin nhắn nào
+                  </p>
+                )}
               </div>
             </div>
+
             {/* Message Input */}
             <div className="bg-white border-t border-gray-200 p-4">
               <div className="flex items-center space-x-3">
-                <Button
-                  type="text"
-                  icon={<i className="fas fa-camera"></i>}
-                  className="cursor-pointer text-pink-500"
-                />
                 <Input
                   placeholder="Gửi tin nhắn..."
                   value={messageInput}
@@ -354,15 +398,10 @@ transform: rotateY(5deg);
                       shape="circle"
                       size="small"
                       icon={<i className="fas fa-paper-plane"></i>}
-                      className="!rounded-button cursor-pointer bg-gradient-to-r from-pink-500 to-red-500 border-0"
+                      className="!rounded-button bg-gradient-to-r from-pink-500 to-red-500 border-0"
                       onClick={handleSendMessage}
                     />
                   }
-                />
-                <Button
-                  type="text"
-                  icon={<i className="fas fa-heart"></i>}
-                  className="cursor-pointer text-pink-500"
                 />
               </div>
             </div>
@@ -370,9 +409,6 @@ transform: rotateY(5deg);
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-pink-50/50 to-white">
             <div className="text-center">
-              <div className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i className="fas fa-heart text-4xl text-pink-400"></i>
-              </div>
               <h3 className="text-xl font-medium text-gray-600 mb-2">
                 Chọn một match để trò chuyện
               </h3>

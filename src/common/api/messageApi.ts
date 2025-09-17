@@ -5,7 +5,7 @@ export const getMessage = (matchId: string) => {
   return res;
 };
 
-export const sendMessage = (matchId: string) => {
-  const res = api.post(`/messages/${matchId}`);
+export const sendMessage = (matchId: string, content: string) => {
+  const res = api.post(`/messages/${matchId}`, { content });
   return res;
 };
