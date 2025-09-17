@@ -1,5 +1,5 @@
 import { Button, Input, message, Modal } from "antd";
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { authLogin, authRegister } from "../../common/api/authApi";
@@ -15,7 +15,7 @@ const Header = () => {
     age: "",
     gender: "male",
   });
-
+  console.log(userRole);
   // Mutation cho login
   const loginMutation = useMutation({
     mutationFn: (data: { email: string; password: string }) => authLogin(data),

@@ -1,12 +1,11 @@
 // The exported code uses Tailwind CSS. Install Tailwind CSS in your dev environment to ensure all styles work.
 import React, { useState, useEffect } from "react";
 import { Button, Card } from "antd";
-import { HeartOutlined } from "@ant-design/icons";
 import * as echarts from "echarts";
 import { Link } from "react-router-dom";
 const HomePage: React.FC = () => {
   const [userRole, setUserRole] = useState<"guest" | "user" | "admin">("guest");
-
+  console.log(setUserRole);
   useEffect(() => {
     if (userRole === "admin") {
       const chartDom = document.getElementById("matchChart");
