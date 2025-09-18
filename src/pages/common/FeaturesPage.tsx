@@ -12,6 +12,9 @@ import { getMessage } from "../../common/api/messageApi";
 import { likeUser } from "../../common/api/likeApi";
 import { getMatches } from "../../common/api/matchApi";
 import { socket } from "../../common/middlewares/socket";
+import ProfileCard from "../../components/common/ProfileCard";
+import MatchList from "../../components/common/MatchList";
+
 const FeaturesPage = () => {
   const [activeTab, setActiveTab] = useState("discover");
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
@@ -54,15 +57,20 @@ const FeaturesPage = () => {
     setCurrentUserIndex((prev) => (prev + 1 < users.length ? prev + 1 : 0));
   };
 
+  const { data: getMS, isLoading: loadingMS } = useQuery({
+    queryKey: ["MESSAGES", selectedChat],
+    queryFn: () => getMessage(selectedChat!),
+    enabled: !!selectedChat,
+    refetchOnMount: true,
+  });
+
+  useEffect(() => {
+    if (getMS) setMessages(getMS);
+  }, [getMS]);
+
   // Lấy tin nhắn khi chọn chat
   useEffect(() => {
     if (!selectedChat) return;
-
-    // fetch tin nhắn cũ
-    getMessage(selectedChat).then((res: any) => {
-      setMessages(res.data.data);
-    });
-
     // join room
     socket.emit("joinRoom", selectedChat);
 
@@ -95,18 +103,11 @@ const FeaturesPage = () => {
     };
 
     socket.emit("sendMessage", newMsg);
-
-    // Optimistic UI
-    // setMessages((prev) => [
-    //   ...prev,
-    //   { ...newMsg, createdAt: new Date().toISOString() },
-    // ]);
-
     setMessageInput("");
   };
 
   // loading
-  if (loadingUser || loadingMatch) {
+  if (loadingUser || loadingMatch || loadingMS) {
     return <Spin>Loading...</Spin>;
   }
   if (!users || users.length === 0) {
@@ -140,14 +141,7 @@ transform: rotateY(5deg);
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-red-500 rounded-lg flex items-center justify-center">
-                <i className="fas fa-heart text-white"></i>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-pink-600 to-red-600 bg-clip-text text-transparent">
-                LoveConnect
-              </span>
-            </div>
+            <div className="flex items-center space-x-2"></div>
           </div>
           <Tabs
             activeKey={activeTab}
@@ -199,32 +193,11 @@ transform: rotateY(5deg);
               </div>
             </div>
           ) : activeTab === "matches" ? (
-            <div className="p-4 space-y-2">
-              {matches?.map((match: any) => (
-                <div
-                  key={match.matchId}
-                  className={`p-4 rounded-lg cursor-pointer transition-colors ${
-                    selectedChat === match.matchId
-                      ? "bg-pink-50 border border-pink-200"
-                      : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => setSelectedChat(match.matchId)}
-                >
-                  <div className="flex items-center space-x-3">
-                    <Avatar src={match.user.photos?.[0]} size={48} />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-gray-900 truncate flex items-center">
-                        {match.user.username}
-                      </h4>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {matches && matches.length === 0 && (
-                <p className="p-4 text-gray-500">No matches yet</p>
-              )}
-            </div>
+            <MatchList
+              matches={matches}
+              selectedChat={selectedChat}
+              setSelectedChat={setSelectedChat}
+            />
           ) : (
             <div className="p-4">
               <div className="text-center mb-6">
@@ -268,55 +241,10 @@ transform: rotateY(5deg);
         {activeTab === "discover" ? (
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="card-stack max-w-sm w-full">
-              <div className="profile-card bg-white rounded-3xl shadow-2xl overflow-hidden relative">
-                <div className="h-96 relative overflow-hidden">
-                  <img
-                    src={photoUrl}
-                    alt={currentUser?.username || "No name"}
-                    className="w-full h-full object-cover rounded-2xl shadow-lg"
-                  />
-                </div>
-                <div className="p-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {currentUser.username} {currentUser.age}
-                  </h2>
-                  <p className="text-gray-600 mb-4 text-sm leading-relaxed">
-                    {currentUser.bio}
-                  </p>
-                  {currentUser?.interests?.length ? (
-                    currentUser.interests.map(
-                      (interest: string, index: number) => (
-                        <span
-                          key={index}
-                          className="bg-pink-100 text-pink-600 px-3 py-1 rounded-full text-sm mr-2"
-                        >
-                          {interest}
-                        </span>
-                      )
-                    )
-                  ) : (
-                    <p className="text-gray-400">Chưa có sở thích</p>
-                  )}
-                  <div className="flex justify-center space-x-4 mt-6">
-                    <Button
-                      shape="circle"
-                      size="large"
-                      className="!rounded-button w-14 h-14 border-2 border-gray-300"
-                      onClick={() => handleSwipeUser("pass")}
-                    >
-                      <CloseOutlined className="text-xl text-gray-500" />
-                    </Button>
-                    <Button
-                      shape="circle"
-                      size="large"
-                      className="!rounded-button w-16 h-16 bg-gradient-to-r from-pink-500 to-red-500 border-0"
-                      onClick={() => handleSwipeUser("like")}
-                    >
-                      <HeartOutlined className="text-2xl text-white" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <ProfileCard
+                currentUser={currentUser}
+                handleSwipeUser={handleSwipeUser}
+              />
             </div>
           </div>
         ) : selectedChat ? (
@@ -344,7 +272,7 @@ transform: rotateY(5deg);
             <div className="flex-1 p-6 overflow-y-auto bg-gradient-to-b from-pink-50/50 to-white">
               <div className="space-y-4">
                 {messages.map((msg: any, idx) => {
-                  const sender = msg.senderId?._id || msg.senderId; // nếu populate thì dùng _id
+                  const sender = msg.senderId?._id || msg.senderId;
                   const isMine = sender?.toString() === userId?.toString();
 
                   return (

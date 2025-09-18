@@ -80,14 +80,14 @@ min-height: 1024px;
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
                   to={"/features"}
-                  type="primary"
-                  className="!rounded-button whitespace-nowrap cursor-pointer text-lg px-8 py-3 h-auto bg-gradient-to-r from-pink-500 to-red-500 border-0"
+                  className="whitespace-nowrap cursor-pointer text-lg px-8 py-3 h-auto bg-gradient-to-r from-pink-500 to-red-500 border-0 rounded-2xl"
                 >
                   Tìm Nửa Kia Ngay
                 </Link>
+
                 <Button
                   size="large"
-                  className="!rounded-button whitespace-nowrap cursor-pointer text-lg px-8 py-3 h-auto border-pink-300 text-pink-600 hover:bg-pink-50"
+                  className="!rounded-button !whitespace-nowrap !cursor-pointer !text-lg !px-8 !py-3 !h-auto !border-pink-300 !text-pink-600 hover:bg-pink-50"
                 >
                   Tìm Hiểu Thêm
                 </Button>
