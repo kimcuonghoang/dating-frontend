@@ -6,7 +6,8 @@ export const getAllUser = async () => {
 };
 export const getProfileUser = async (userId: string) => {
   const res = await api.get(`/users/${userId}`);
-  return res;
+
+  return res.data.data;
 };
 
 export const updateProfileUser = async (userId: string, data: any) => {

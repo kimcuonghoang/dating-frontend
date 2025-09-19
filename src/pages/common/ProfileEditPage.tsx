@@ -15,7 +15,7 @@ const ProfileEditPage = () => {
   // Lấy dữ liệu user
   const { data, isLoading } = useQuery({
     queryKey: ["USERS", userId],
-    queryFn: () => getProfileUser(userId),
+    queryFn: () => getProfileUser(userId!),
     enabled: !!userId,
   });
 

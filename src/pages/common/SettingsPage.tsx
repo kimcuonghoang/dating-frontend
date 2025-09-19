@@ -51,12 +51,12 @@ const SettingsPage = () => {
               Đổi Mật Khẩu
             </button>
             <button
-              onClick={() => {
-                localStorage.clear();
-                setUserRole("guest");
-                setUsername(null);
-                message.info("Đã đăng xuất!");
-              }}
+              // onClick={() => {
+              //   localStorage.clear();
+              //   setUserRole("guest");
+              //   setUsername(null);
+              //   message.info("Đã đăng xuất!");
+              // }}
               className="flex-1 px-6 py-3 rounded-full bg-gray-100 text-gray-800 font-medium shadow-md hover:bg-gray-200 transition"
             >
               Đăng Xuất

@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+.ant-btn-reset {
+  all: unset; /* xoá hết CSS mặc định AntD */
+  display: inline-block;
+}

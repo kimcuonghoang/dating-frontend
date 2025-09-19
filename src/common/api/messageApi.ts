@@ -1,11 +1,11 @@
 import api from "./index";
 
-export const getMessage = (matchId: string) => {
-  const res = api.get(`/messages/${matchId}`);
-  return res;
+export const getMessage = async (matchId: string) => {
+  const res = await api.get(`/messages/${matchId}`);
+  return res.data.data;
 };
 
-export const sendMessage = (matchId: string, content: string) => {
-  const res = api.post(`/messages/${matchId}`, { content });
+export const sendMessage = async (matchId: string, content: string) => {
+  const res = await api.post(`/messages/${matchId}`, { content });
   return res;
 };
